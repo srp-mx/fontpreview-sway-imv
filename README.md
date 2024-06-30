@@ -3,27 +3,31 @@
 `fontpreview` is a commandline tool that lets you **quickly search** for fonts
 that are installed on your machine and preview them. The **fuzzy search** feature
 is provided by `fzf` and the preview is generated with `imagemagick` and then
-displayed using `nsxiv`. This tool is **highly customizable**, almost all of the
+displayed using `imv`. This tool is **highly customizable**, almost all of the
 variables in this tool can be changed using the commandline flags or you can
 configure them using environment variables.
+
+This repository is a fork of [`fontpreview`](https://github.com/sdushantha/fontpreview)
+by [sdushantha](https://github.com/sdushantha/), adapting their work to avoid
+having to install the X11 tools `xdotool` and `nsxiv` in `sway`.
 
 ![](extra/demo.gif)
 
 ## Dependencies
 
-- `xdotool`
+- `sway` (should include `swaymsg`)
 - `fzf`
 - `imagemagick`
-- `nsxiv`
+- `imv`
 
 ## Installation
 ### Install using `make`
 ```bash
 # Clone the repo
-$ git clone https://github.com/sdushantha/fontpreview
+$ git clone https://github.com/srp-mx/fontpreview-sway-imv
 
-# Change your current directory to fontpreview
-$ cd fontpreview
+# Change your current directory to fontpreview-sway-imv
+$ cd fontpreview-sway-imv
 
 # Install it
 $ sudo make install
@@ -33,7 +37,7 @@ $ sudo make install
 ```bash
 # Download the fontpreview source code, save as fontpreview
 # and make it executeable
-$ curl -L https://git.io/raw_fontpreview > fontpreview && chmod +x fontpreview
+$ curl -L https://raw.githubusercontent.com/srp-mx/fontpreview-sway-imv/master/fontpreview > fontpreview && chmod +x fontpreview
 
 # Then move fontpreview to somewhere in your $PATH
 # Here is an example
@@ -74,15 +78,6 @@ image.
 ```
 $ fontpreview -i font.otf -o preview.png
 ```
-
-This can be used with [überzug](https://github.com/seebye/ueberzug)
-to implement font preview within terminal file managers such as
-[vifm](https://vifm.info/).
-
-![](extra/vifm.png)
-
-A detailed setup instructions can be found [here](https://krasjet.com/scribbles/font-preview.html)
-
 
 ## Configure
 You can configure `fontpreview` through environment variables.

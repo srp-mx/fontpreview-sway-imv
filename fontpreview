@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
 # Siddharth Dushantha 2020
+# Santiago Romero 2024
 #
-# Dependencies: nsxiv, imagemagick, xdotool, fzf
+# Dependencies: imv, imagemagick, sway, fzf
 
 VERSION=1.0.7
 
@@ -14,6 +15,9 @@ FONT_SIZE=38
 BG_COLOR="#ffffff"
 FG_COLOR="#000000"
 PREVIEW_TEXT="ABCDEFGHIJKLM\nNOPQRSTUVWXYZ\nabcdefghijklm\nnopqrstuvwxyz\n1234567890\n!@$\%(){}[]\nالسلام عليكم"
+
+# imv window title. sway searches this name, so prefer giving it a unique name.
+WINDOW_TITLE="// fontpreview - imv //"
 
 show_help() {
 printf "%s" "\
@@ -42,9 +46,9 @@ optional arguments:
 }
 
 pre_exit() {
-    # Get the proccess ID of this script and kill it.
+    # Get the process ID of this script and kill it.
     # We are dumping the output of kill to /dev/null
-    # because if the user quits nsxiv before they
+    # because if the user quits imv before they
     # exit this script, an error will be shown
     # from kill and we dont want that
     kill -9 "$(cat "$PIDFILE" 2>/dev/null)" &> /dev/null
@@ -65,8 +69,8 @@ generate_preview(){
 }
 
 main(){
-    # Checkig if needed dependencies are installed
-    dependencies=(xdotool nsxiv magick fzf)
+    # Checking if needed dependencies are installed
+    dependencies=(swaymsg imv magick fzf)
     for dependency in "${dependencies[@]}"; do
         type -p "$dependency" &>/dev/null || {
             echo "error: Could not find '${dependency}', is it installed?" >&2
@@ -74,10 +78,10 @@ main(){
         }
     done
 
-    # Checking for enviornment variables which the user might have set.
+    # Checking for environment variables which the user might have set.
     # This config file for fontpreview is pretty much the bashrc, zshrc, etc
-    # Majority of the variables in fontpreview can changed using the enviornment variables
-    # and this makes fontpreview very customizable
+    # Most of the variables in fontpreview can be changed using the environment
+    # variables and this makes fontpreview very customizable
     [[ $FONTPREVIEW_SEARCH_PROMPT != "" ]] && SEARCH_PROMPT=$FONTPREVIEW_SEARCH_PROMPT
     [[ $FONTPREVIEW_SIZE != "" ]] && SIZE=$FONTPREVIEW_SIZE
     [[ $FONTPREVIEW_POSITION != "" ]] && POSITION=$FONTPREVIEW_POSITION
@@ -85,12 +89,6 @@ main(){
     [[ $FONTPREVIEW_BG_COLOR != "" ]] && BG_COLOR=$FONTPREVIEW_BG_COLOR
     [[ $FONTPREVIEW_FG_COLOR != "" ]] && FG_COLOR=$FONTPREVIEW_FG_COLOR
     [[ $FONTPREVIEW_PREVIEW_TEXT != "" ]] && PREVIEW_TEXT=$FONTPREVIEW_PREVIEW_TEXT
-
-    # Save the window ID of the terminal window fontpreview is executed in.
-    # This is so that when we open up nsxiv, we can change the focus back to
-    # the terminal window, so that the user can search for the fonts without
-    # having to manualy change the focus back to the terminal.
-    xdotool getactivewindow > "$TERMWIN_IDFILE"
 
     # Flag to run some commands only once in the loop
     FIRST_RUN=true
@@ -109,42 +107,36 @@ main(){
         if [[ $FIRST_RUN == true ]]; then
             FIRST_RUN=false
 
-            # Display the font preview using nsxiv
-            #nsxiv -g "$SIZE$POSITION" "$FONT_PREVIEW" -N "fontpreview" -b &
-            nsxiv -N "fontpreview" -b -g "$SIZE$POSITION" "$FONT_PREVIEW" &
+            # Display the font preview using imv, not giving it focus
+            swaymsg "no_focus [title=\"$WINDOW_TITLE\"], exec imv -w '$WINDOW_TITLE' -s shrink '$FONT_PREVIEW' &"
 
-            # Change focus from nsxiv, back to the terminal window
-            # so that user can continue to search for fonts without
-            # having to manually change focus back to the terminal window
-            xdotool windowfocus "$(cat "$TERMWIN_IDFILE")"
+            # Wait a little bit for the window to actually open in order for us
+            # to get the process id.
+            sleep 0.1
 
-            # Save the process ID so that we can kill
-            # nsxiv when the user exits the script
-            echo $! >"$PIDFILE"
+            # Save the process ID so that we can kill imv when the user exits
+            # the script
+            swaymsg -t get_tree | jq ".. | select(.type?) | select(.name == \"$WINDOW_TITLE\") | .pid" > "$PIDFILE"
 
-	# Check for crashes of nsxiv
-	elif [[ -f $PIDFILE ]] ; then
-	    if ! pgrep -F "$PIDFILE" >/dev/null 2>&1; then
-		echo "Restart nsxiv - You maybe using a obsolete version. " >&2
-		# Display the font preview using nsxiv
-		nsxiv -g "$SIZE$POSITION" -N "fontpreview" -b "$FONT_PREVIEW" &
+        # Check for crashes of nsxiv
+        elif [[ -f $PIDFILE ]] ; then
+            if ! pgrep -F "$PIDFILE" >/dev/null 2>&1; then
+                echo "Restarting imv" >&2
+                # Display the font preview using imv
+                swaymsg "no_focus [title=\"$WINDOW_TITLE\"], exec imv -w '$WINDOW_TITLE' -s shrink '$FONT_PREVIEW' &"
+                # Wait a little for the window to open before capturing PID
+                sleep 0.1
+                # Save the process ID so that we can kill imv when the user
+                # exits the script
+                swaymsg -t get_tree | jq ".. | select(.type?) | select(.name == \"$WINDOW_TITLE\") | .pid" > "$PIDFILE"
+            fi
 
-		# Change focus from nsxiv, back to the terminal window
-		# so that user can continue to search for fonts without
-		# having to manually change focus back to the terminal window
-		xdotool windowfocus "$(cat "$TERMWIN_IDFILE")"
-
-		# Save the process ID so that we can kill
-		# nsxiv when the user exits the script
-		echo $! >"$PIDFILE"
-	    fi
-
-	fi
+        fi
     done
 }
 
 # Disable CTRL-Z because if we allowed this key press,
-# then the script would exit but, nsxiv would still be
+# then the script would exit but, imv would still be
 # running
 trap "" SIGTSTP
 
@@ -157,8 +149,6 @@ PIDFILE="$FONTPREVIEW_DIR/fontpreview.pid"
 touch "$PIDFILE" || exit
 FONT_PREVIEW="$FONTPREVIEW_DIR/fontpreview.png"
 touch "$FONT_PREVIEW" || exit
-TERMWIN_IDFILE="$FONTPREVIEW_DIR/fontpreview.termpid"
-touch "$TERMWIN_IDFILE" || exit
 
 font=$1
 
@@ -225,11 +215,9 @@ done
 if [ -f "$font" ]; then
     generate_preview "$font" "$FONT_PREVIEW"
 
-    # Display the font preview using nsxiv
-    nsxiv -g "$SIZE$POSITION" -N "fontpreview" -b "$FONT_PREVIEW" &
+    # Display the font preview using imv
+    imv -w "$WINDOW_TITLE" -s shrink "$FONT_PREVIEW" &
 
-    # For some strange reason, nsxiv just doesnt have time to read the file
-    sleep 0.1
     exit
 fi
 
